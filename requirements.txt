@@ -1,7 +1,7 @@
-yfinance
-pandas
-matplotlib
-numpy
+flask
 requests
 gspread
 oauth2client
+pandas
+numpy
+yfinance
