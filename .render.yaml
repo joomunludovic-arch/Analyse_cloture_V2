@@ -2,11 +2,10 @@ services:
   - type: web
     name: analyse-cloture
     env: python
-    plan: free
     buildCommand: ""
-    startCommand: "python main.py"
+    startCommand: "gunicorn main:app"
     envVars:
       - key: TELEGRAM_TOKEN
-        value: 8415756245:AAHaU2KBRsC3q05eLld2JjMt_V7S9j-o4ys
+        sync: false
       - key: CHAT_ID
-        value: 5814604646
+        sync: false
