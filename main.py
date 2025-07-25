@@ -83,3 +83,6 @@ def run_analysis():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000)
+    creds = ServiceAccountCredentials.from_json_keyfile_name(
+    "/etc/secrets/credentials.json", scope
+)
