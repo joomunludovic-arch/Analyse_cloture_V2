@@ -1,4 +1,7 @@
-flask
+yfinance
 pandas
+matplotlib
 numpy
 requests
+gspread
+oauth2client
