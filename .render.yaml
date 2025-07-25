@@ -6,6 +6,6 @@ services:
     startCommand: "gunicorn main:app"
     envVars:
       - key: TELEGRAM_TOKEN
-        sync: false
+        sync: 8415756245:AAHaU2KBRsC3q05eLld2JjMt_V7S9j-o4ys
       - key: CHAT_ID
-        sync: false
+        sync: 5814604646
