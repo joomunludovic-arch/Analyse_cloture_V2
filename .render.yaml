@@ -1,11 +1,16 @@
 services:
   - type: web
-    name: analyse-cloture
+    name: cloture-v2
     env: python
     buildCommand: ""
-    startCommand: "gunicorn main:app"
+    startCommand: gunicorn main:app
     envVars:
-      - key: TELEGRAM_TOKEN
-        sync: 8415756245:AAHaU2KBRsC3q05eLld2JjMt_V7S9j-o4ys
-      - key: CHAT_ID
-        sync: 5814604646
+      - key: GOOGLE_APPLICATION_CREDENTIALS
+        value: /etc/secrets/credentials.json
+      - key: 8415756245:AAHaU2KBRsC3q05eLld2JjMt_V7S9j-o4ys
+        value: ton_token
+      - key: 5814604646
+        value: ton_chat_id
+    secretFiles:
+      - path: /etc/secrets/credentials.json
+        name: credentials.json
