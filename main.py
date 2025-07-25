@@ -8,32 +8,25 @@ from flask import Flask
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-# Flask app
 app = Flask(__name__)
 
-# Telegram credentials
+# Chargement des variables d'environnement
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
-
-# Google Sheets scope
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name(
-    "/etc/secrets/credentials.json", scope
-)
+GOOGLE_CREDS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     data = {"chat_id": CHAT_ID, "text": message}
-    try:
-        requests.post(url, data=data)
-    except Exception as e:
-        print(f"Erreur envoi Telegram : {e}")
+    requests.post(url, data=data)
 
-def get_tickers_from_sheets():
+def get_tickers_from_google_sheets():
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds = ServiceAccountCredentials.from_json_keyfile_name(GOOGLE_CREDS, scope)
     client = gspread.authorize(creds)
-    sheet = client.open_by_key("1-hPKh5yJq6F-eboLbsG8sLxwdesI9LPH2L08emI7i6g")
-    data = sheet.sheet1.col_values(2)[1:]  # Colonne B (indexée à 2), sans le header
-    return [ticker.strip().upper() for ticker in data if ticker.strip()]
+    sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1-hPKh5yJq6F-eboLbsG8sLxwdesI9LPH2L08emI7i6g/edit").sheet1
+    tickers = sheet.col_values(2)[1:]
+    return tickers
 
 def calculate_ichimoku(df):
     df['Tenkan_sen'] = df['Close'].rolling(window=9).mean()
@@ -43,14 +36,13 @@ def calculate_ichimoku(df):
 @app.route('/')
 def run_analysis():
     try:
-        tickers = get_tickers_from_sheets()
+        tickers = get_tickers_from_google_sheets()
         all_signals = []
 
         for ticker in tickers:
-            df = yf.download(ticker, period="3mo", interval="1d", progress=False)
-            if df.empty:
-                continue
+            df = yf.download(ticker, period="3mo")
             df.reset_index(inplace=True)
+            df = df.sort_values(by='Date')
             df['Volatility'] = df['Close'].rolling(window=10).std()
             vol_mean = df['Volatility'].mean()
             vol_std = df['Volatility'].std()
@@ -59,35 +51,41 @@ def run_analysis():
 
             df['Signal'] = np.where(
                 (df['Z_score'] > 2) & (df['Close'] > df['Tenkan_sen']) & (df['Close'] > df['Kijun_sen']),
-                "📈 Signal haussier",
+                "ð Signal haussier",
                 np.where(
                     (df['Z_score'] > 2) & (df['Close'] < df['Tenkan_sen']) & (df['Close'] < df['Kijun_sen']),
-                    "📉 Signal baissier",
+                    "ð Signal baissier",
                     ""
                 )
             )
 
-            signals = df[df['Signal'] != ""][['Date', 'Close', 'Z_score', 'Signal']].tail(1)
-            if not signals.empty:
-                signals["Ticker"] = ticker
-                all_signals.append(signals)
+            signals = df[df['Signal'] != ""][['Date', 'Close', 'Z_score', 'Signal']].tail(3)
+            signals['Ticker'] = ticker
+            all_signals.append(signals)
 
-        if all_signals:
-            result = pd.concat(all_signals)
+        final_alerts = pd.concat(all_signals)
+        if not final_alerts.empty:
             messages = []
-            for _, row in result.iterrows():
-                messages.append(
-                    f"📌 {row['Ticker']} - {row['Date'].strftime('%Y-%m-%d')}\n"
-                    f"💰 {row['Close']:.2f} | Z={row['Z_score']:.2f}\n"
+            for _, row in final_alerts.iterrows():
+                msg = (
+                    f"ð {row['Ticker']} - {row['Date'].strftime('%Y-%m-%d')}
+"
+                    f"ð° {row['Close']:.2f} | Z={row['Z_score']:.2f}
+"
                     f"{row['Signal']}"
                 )
-            send_telegram_message("📊 Signaux détectés :\n\n" + "\n\n".join(messages))
+                messages.append(msg)
+            send_telegram_message("ð Signaux dÃ©tectÃ©s :
+
+" + "
+
+".join(messages))
         else:
-            send_telegram_message("✅ Aucune anomalie détectée aujourd’hui.")
-        return "✅ Analyse exécutée avec succès"
+            send_telegram_message("â Aucune anomalie dÃ©tectÃ©e aujourdâhui.")
+        return "â Analyse exÃ©cutÃ©e avec succÃ¨s"
     except Exception as e:
-        send_telegram_message(f"❌ Erreur dans le script : {str(e)}")
-        return f"❌ Erreur : {str(e)}"
+        send_telegram_message(f"â Erreur : {str(e)}")
+        return f"â Erreur dans le script : {str(e)}"
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=8000)
+    app.run(host='0.0.0.0', port=8000)
